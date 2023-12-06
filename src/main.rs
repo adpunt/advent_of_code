@@ -3,10 +3,9 @@ use std::io::{BufRead, BufReader};
 use std::collections::HashMap;
 use regex::Regex;
 use std::collections::HashSet;
-use rayon::prelude::*;
 
 fn main() -> Result<(), std::io::Error> {
-    let file = File::open("input_day5.txt")?;
+    let file = File::open("input_day6.txt")?;
     let reader = BufReader::new(file);
 
     // let result = calculate_sum_written_numbers(reader)?;
@@ -14,7 +13,8 @@ fn main() -> Result<(), std::io::Error> {
     // let results = find_adjacent_numbers(reader)?;
     // let results = scratchcard_score(reader)?;
     // let results = scratchcard_recursive(reader)?;
-    let results = almanac(reader)?;
+    // let results = almanac(reader)?;
+    let results = boat_races(reader)?;
 
     println!("{}", results);
 
@@ -423,6 +423,10 @@ where
     Ok(s)
 }
 
+
+
+
+
 fn process_lines(contents: Vec<String>) -> Result<(Vec<HashMap::<u64, (u64, u64)>>, Vec<u64>), std::io::Error>
 {
     let mut master_mapping: Vec<HashMap::<u64, (u64, u64)>> = Vec::new();
@@ -532,6 +536,68 @@ where
     Ok(min_location)
 }
 
+
+// Time:      7  15   30
+// Distance:  9  40  200
+
+fn boat_races<R>(reader: R) -> Result<i32, std::io::Error>
+where
+    R: BufRead,
+{ 
+    let numbers_pattern = Regex::new(r"\d+").unwrap();
+    let digits_pattern = Regex::new(r"\d").unwrap();
+    let mut s: usize = 1;
+    let contents: Vec<_> = reader.lines().filter_map(Result::ok).collect();
+
+    let line0 = &contents[0];
+    let line1 = &contents[1];
+
+    let numbers_time: Vec<i32> = numbers_pattern
+                .find_iter(line0)
+                .map(|match_| match_.as_str().parse::<i32>())
+                .filter_map(|parsed| parsed.ok())
+                .collect();
+    let numbers_distance: Vec<i32> = numbers_pattern
+                .find_iter(line1)
+                .map(|match_| match_.as_str().parse::<i32>())
+                .filter_map(|parsed| parsed.ok())
+                .collect();
+
+    // Only do the following code for pt 2
+    // Join the digit characters into a single string and parse as an integer
+    let combined_string_time: String = numbers_time.iter().map(|&digit| digit.to_string()).collect();
+    let single_time = combined_string_time.parse::<usize>().unwrap();
+    let numbers_time = [single_time];
+
+    let combined_string_distance: String = numbers_distance.iter().map(|&digit| digit.to_string()).collect();
+    let single_distance = combined_string_distance.parse::<usize>().unwrap();
+    let numbers_distance = [single_distance];
+
+    println!("numbers_time: {:?}", numbers_time);
+    println!("numbers_distance: {:?}", numbers_distance);
+
+    let mut all_wins: Vec<usize> = Vec::new();
+    for i in 0..numbers_time.len() {
+        let mut num_ways_to_win = 0;
+        let time = numbers_time[i] as usize;
+        let best_distance = numbers_distance[i] as usize;
+        for j in 1..time-1 {
+            let distance = j * (time - j);
+            // println!("race distance: {}", distance);
+            if distance > best_distance as usize {
+                num_ways_to_win += 1;
+            }
+        }
+        all_wins.push(num_ways_to_win);
+    }
+    println!("all wins: {:?}", all_wins);
+    for w in all_wins {
+        s *= w;
+    }
+    Ok(s as i32)
+
+}
+
 // fn next_function<R>(reader: R) -> Result<i32, std::io::Error>
 // where
 //     R: BufRead,
@@ -543,6 +609,3 @@ where
 //     }
 //     Ok(s)
 // }
-
-// Can construct as a graph potentially 
-// can re-construct hashmap to make it sorted (if alamancs too big)

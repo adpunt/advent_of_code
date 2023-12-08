@@ -5,7 +5,7 @@ use regex::Regex;
 use std::collections::HashSet;
 
 fn main() -> Result<(), std::io::Error> {
-    let file = File::open("input_day6.txt")?;
+    let file = File::open("input_day7.txt")?;
     let reader = BufReader::new(file);
 
     // let result = calculate_sum_written_numbers(reader)?;
@@ -14,7 +14,8 @@ fn main() -> Result<(), std::io::Error> {
     // let results = scratchcard_score(reader)?;
     // let results = scratchcard_recursive(reader)?;
     // let results = almanac(reader)?;
-    let results = boat_races(reader)?;
+    // let results = boat_races(reader)?;
+    let results = process_cards(reader)?;
 
     println!("{}", results);
 
@@ -423,10 +424,6 @@ where
     Ok(s)
 }
 
-
-
-
-
 fn process_lines(contents: Vec<String>) -> Result<(Vec<HashMap::<u64, (u64, u64)>>, Vec<u64>), std::io::Error>
 {
     let mut master_mapping: Vec<HashMap::<u64, (u64, u64)>> = Vec::new();
@@ -521,7 +518,7 @@ where
         }
     }
 
-    // TODO: uncomment for part 1
+    // Uncomment for part 1
     // for s in seeds {
     //     let mut source = s;
     //     println!("source: {}", source);
@@ -536,16 +533,11 @@ where
     Ok(min_location)
 }
 
-
-// Time:      7  15   30
-// Distance:  9  40  200
-
 fn boat_races<R>(reader: R) -> Result<i32, std::io::Error>
 where
     R: BufRead,
 { 
     let numbers_pattern = Regex::new(r"\d+").unwrap();
-    let digits_pattern = Regex::new(r"\d").unwrap();
     let mut s: usize = 1;
     let contents: Vec<_> = reader.lines().filter_map(Result::ok).collect();
 
@@ -564,7 +556,6 @@ where
                 .collect();
 
     // Only do the following code for pt 2
-    // Join the digit characters into a single string and parse as an integer
     let combined_string_time: String = numbers_time.iter().map(|&digit| digit.to_string()).collect();
     let single_time = combined_string_time.parse::<usize>().unwrap();
     let numbers_time = [single_time];
@@ -597,6 +588,189 @@ where
     Ok(s as i32)
 
 }
+
+#[derive(Debug)]
+struct Card {
+    bid: i32, 
+    original_str: String
+}
+
+fn get_suit_number(suit: char) -> i32 
+{
+    const RADIX: i32 = 10;
+    if suit == 'T' {
+        return 10;
+    }
+    else if suit == 'J' {
+        // Pt 1 returns 11
+        // return 11;
+        return 1;
+    }
+    else if suit == 'Q' {
+        return 12;
+    }
+    else if suit == 'K' {
+        return 13;
+    }
+    else if suit == 'A' {
+        return 14;
+    }
+    else {
+        return suit as i32 - '0' as i32
+    }
+}
+
+fn compare_cards(a_card: &Card, b_card: &Card) -> std::cmp::Ordering {
+    let a: &str = &a_card.original_str;
+    let b: &str = &b_card.original_str;
+    for (char_a, char_b) in a.chars().zip(b.chars()) {
+        let value_a = get_suit_number(char_a);
+        let value_b = get_suit_number(char_b);
+        if value_a != value_b {
+            return value_a.cmp(&value_b);
+        }
+    }
+    // If all characters are equal, compare the lengths of the strings
+    a.len().cmp(&b.len())
+}
+
+fn sort_and_rank(mut ar: Vec<Card>, mut rank: i32, mut s: i32) -> (i32, i32) {
+    ar.sort_by(|a, b| compare_cards(a, b));
+    for card in &ar {
+        println!("card.bid {} * rank: {}", card.bid, rank);
+        s += card.bid * rank;
+        rank += 1;
+    }
+    return (rank, s)
+}
+
+fn process_cards<R>(reader: R) -> Result<i32, std::io::Error>
+where
+    R: BufRead,
+{ 
+    let mut s: i32 = 0;
+    let contents: Vec<_> = reader.lines().filter_map(Result::ok).collect();
+
+    let mut ar_five: Vec<Card> = Vec::new();
+    let mut ar_four: Vec<Card> = Vec::new();
+    let mut ar_full_house: Vec<Card> = Vec::new();
+    let mut ar_three: Vec<Card> = Vec::new();
+    let mut ar_two_pair: Vec<Card> = Vec::new();
+    let mut ar_one_pair: Vec<Card> = Vec::new();
+    let mut ar_single: Vec<Card> = Vec::new();
+
+    'outer: for i in 0..contents.len() {
+        let line = &contents[i];
+        let parts: Vec<_> = line.split(" ").map(String::from).collect();
+        let card_str: &String = &parts[0];
+        let card_char_vec: Vec<char> = card_str.chars().collect();
+        let bid = parts[1].parse::<i32>().unwrap();
+
+        // Check for J, only for pt 2
+        // let num_J = 0
+        let num_J = card_str.matches("J").count();
+
+        // Chcek for 5 in a row 
+        if card_char_vec.iter().min() == card_char_vec.iter().max() {
+            let card = Card {
+                bid: bid,
+                original_str: card_str.to_string()
+            };
+            ar_five.push(card);
+            continue 'outer;
+        }
+
+        let card = Card {
+            bid: bid,
+            original_str: card_str.to_string()
+        };
+
+        // Character counting
+        let mut char_counts: HashMap<char,i32> = HashMap::new();
+        for c in &card_char_vec {
+            *char_counts.entry(*c).or_insert(0) += 1;
+        }
+
+        for (&c, &count) in &char_counts {
+            // Check for 4 in a row
+            if count == 4 {
+                if num_J > 0 {
+                    ar_five.push(card)
+                }
+                else {
+                    ar_four.push(card);
+                }
+                continue 'outer
+            }
+
+            else if count == 3 {
+                if char_counts.len() == 2 {
+                    if num_J > 0 {
+                        ar_five.push(card)
+                    }
+                    else {
+                        ar_full_house.push(card);
+                    }
+                }
+                else {
+                    if num_J > 0 {
+                        ar_four.push(card)
+                    }
+                    else {
+                        ar_three.push(card);
+                    }
+                }
+                continue 'outer
+            }
+        }
+
+        for (&c, &count) in &char_counts {
+            if count == 2 {
+                if char_counts.len() == 3 {
+                    if num_J == 2 {
+                        ar_four.push(card);
+                    }
+                    else if num_J == 1 {
+                        ar_full_house.push(card);
+                    }
+                    else {
+                        ar_two_pair.push(card);
+                    }
+                }
+                else {
+                    if num_J > 0 {
+                        ar_three.push(card);
+                    }
+                    else {
+                        ar_one_pair.push(card);
+                    }
+                }
+                continue 'outer
+            }
+        }
+        if num_J > 0 {
+            ar_one_pair.push(card);
+        }
+        else {
+            ar_single.push(card);
+        }
+    }
+
+    let mut rank: i32 = 1;
+
+    (rank, s) = sort_and_rank(ar_single, rank, s);
+    (rank, s) = sort_and_rank(ar_one_pair, rank, s);
+    (rank, s) = sort_and_rank(ar_two_pair, rank, s);
+    (rank, s) = sort_and_rank(ar_three, rank, s);
+    (rank, s) = sort_and_rank(ar_full_house, rank, s);
+    (rank, s) = sort_and_rank(ar_four, rank, s);
+    (rank, s) = sort_and_rank(ar_five, rank, s);
+
+    Ok(s)
+}
+
+
+
 
 // fn next_function<R>(reader: R) -> Result<i32, std::io::Error>
 // where
